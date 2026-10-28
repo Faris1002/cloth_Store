@@ -14,23 +14,34 @@ import cartRoutes from './routes/cartRoutes.js';
 
 const app = express();
 
+// Trust reverse proxy (required for Render, Heroku, Cloudflare for real client IP and rate limiting)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
 // CORS configuration
+const cleanFrontendUrl = env.FRONTEND_URL ? env.FRONTEND_URL.replace(/\/+$/, '') : '';
 const allowedOrigins = [
   env.FRONTEND_URL,
+  cleanFrontendUrl,
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
-];
+].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, postman)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+      const cleanOrigin = origin.replace(/\/+$/, '');
+      if (
+        allowedOrigins.includes(origin) ||
+        allowedOrigins.includes(cleanOrigin) ||
+        origin.startsWith('http://localhost:') ||
+        origin.endsWith('.vercel.app')
+      ) {
         return callback(null, true);
       }
       return callback(new Error('CORS policy does not allow access from the specified Origin.'));
@@ -49,6 +60,17 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 if (env.NODE_ENV !== 'test') {
   app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
+
+// Root & Health endpoints for Render health checks and uptime monitors
+app.get(['/', '/health'], (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'clothing-store-backend',
+    message: 'ModernWear API is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
 
 // Global API rate limiting
 app.use('/api', apiRateLimiter);

@@ -16,7 +16,18 @@ export const RegisterPage = () => {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
+  const [isWarmingUp, setIsWarmingUp] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let timer;
+    if (loading) {
+      timer = setTimeout(() => setIsWarmingUp(true), 3500);
+    } else {
+      setIsWarmingUp(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -181,7 +192,8 @@ export const RegisterPage = () => {
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Creating Account...
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {isWarmingUp ? 'Waking up server...' : 'Creating Account...'}
               </>
             ) : (
               <>
@@ -189,6 +201,12 @@ export const RegisterPage = () => {
               </>
             )}
           </button>
+
+          {isWarmingUp && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200/80 rounded-xl p-2.5 text-center animate-pulse">
+              ⏳ Server is waking up (Render free tier takes ~30s on cold start). Please keep this tab open!
+            </p>
+          )}
         </form>
 
         {/* Footer Link */}

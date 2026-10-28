@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { CartProvider } from './context/CartContext.jsx';
+import { api } from './services/api.js';
 
 // Components
 import Navbar from './components/Navbar.jsx';
@@ -20,6 +21,11 @@ import AddProductPage from './pages/AddProductPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 
 function App() {
+  useEffect(() => {
+    // Proactively warm up backend instance on Render so cold starts don't block user actions
+    api.get('/health', { timeout: 60000 }).catch(() => {});
+  }, []);
+
   return (
     <BrowserRouter>
       <ToastProvider>

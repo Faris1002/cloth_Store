@@ -1,14 +1,19 @@
 import axios from 'axios';
 import { supabase } from '../lib/supabase.js';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// Clean and normalize base URL (handles missing /api or accidental trailing slashes)
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api')
+  .trim()
+  .replace(/\/+$/, '');
+const API_BASE_URL = rawBaseUrl.endsWith('/api') ? rawBaseUrl : `${rawBaseUrl}/api`;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  // 60,000ms (60s) accommodates Render free-tier cold starts which take 30-50s when sleeping
+  timeout: 60000,
 });
 
 // Request interceptor to attach local auth token or Supabase session token
@@ -37,6 +42,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Specific, friendly error message when Render is spinning up from sleep
+    if (
+      error.code === 'ECONNABORTED' ||
+      (error.message && error.message.toLowerCase().includes('timeout'))
+    ) {
+      const coldStartError = new Error(
+        'Server is currently waking up from idle mode (Render free-tier cold start takes ~30-50s). Please wait a few seconds and try again.'
+      );
+      coldStartError.code = 'SERVER_COLD_START';
+      coldStartError.status = 504;
+      coldStartError.originalError = error;
+      return Promise.reject(coldStartError);
+    }
+
     const errorResponse = error.response?.data?.error;
     const message =
       errorResponse?.message ||

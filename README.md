@@ -241,25 +241,165 @@ npm run build
 
 ---
 
-## 🌐 Deployment Instructions
+## 🌐 Step-by-Step Deployment Guide (Render + Vercel)
 
-### Frontend (e.g., Vercel, Netlify, Cloudflare Pages)
-1. Link your Git repository to Vercel or Netlify.
-2. Set the **Root Directory** to `frontend`.
-3. Set **Build Command** to `npm run build` and **Output Directory** to `dist`.
-4. Configure Environment Variables in the hosting dashboard:
-   - `VITE_API_BASE_URL`: The production URL of your backend (e.g., `https://api.yourdomain.com/api`).
-   - `VITE_SUPABASE_URL`: Your Supabase Project URL.
-   - `VITE_SUPABASE_ANON_KEY`: Your Supabase Anon Key.
+This project is organized as a monorepo containing both the backend Express API and the frontend React application. Follow these instructions to deploy the **Backend on Render** and the **Frontend on Vercel**.
 
-### Backend (e.g., Render, Railway, Fly.io, Heroku)
-1. Deploy from the `backend` folder.
-2. Set **Start Command** to `node server.js`.
-3. Configure Environment Variables:
-   - `PORT`: Provided by host or `5000`.
-   - `NODE_ENV`: `production`.
-   - `FRONTEND_URL`: Your deployed frontend URL (e.g., `https://modernwear.vercel.app`).
-   - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+```
+┌────────────────────────┐         ┌────────────────────────┐         ┌────────────────────────┐
+│     Vercel (React)     │ ──────> │     Render (Express)   │ ──────> │   Supabase PostgreSQL  │
+│  modernwear.vercel.app │  REST   │ modernwear.onrender.com│ SQL/Auth│  gsarrfbnnvdpyqikqkmb  │
+└────────────────────────┘         └────────────────────────┘         └────────────────────────┘
+```
+
+---
+
+### Step 1: Push Code to GitHub
+
+Ensure your project is pushed to a remote GitHub repository:
+
+1. Check that `.env` files are ignored so secrets are not pushed:
+   ```bash
+   git status
+   ```
+   *(Ensure `backend/.env` and `frontend/.env` are listed in `.gitignore` and not tracked)*
+  
+2. Commit and push your code:
+   ```bash
+   git add .
+   git commit -m "Configure production deployment for Render and Vercel"
+   git push origin main
+   ```
+
+---
+
+### Step 2: Deploy Backend on Render (Web Service)
+
+[Render](https://render.com) hosts the Node.js Express API.
+
+1. **Sign in to Render**:
+   - Go to [dashboard.render.com](https://dashboard.render.com) and log in with your GitHub account.
+
+2. **Create a New Web Service**:
+   - Click the **New +** button in the top navigation bar.
+   - Select **Web Service**.
+   - Choose **Build and deploy from a Git repository**.
+   - Select your repository from the list and click **Connect**.
+
+3. **Configure the Web Service Settings**:
+   Fill in the service details:
+   - **Name**: `cloth-store-backend` *(or any unique name of your choice)*
+   - **Region**: Choose the region closest to your users (e.g., *Frankfurt*, *Oregon*, *Singapore*)
+   - **Branch**: `main`
+   - **Root Directory**: `backend`  *(⚠️ CRITICAL: do not leave blank! This tells Render to run inside the backend folder)*
+   - **Runtime**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start` *(or `node server.js`)*
+   - **Instance Type**: Select **Free**
+
+4. **Add Environment Variables**:
+   Scroll down to the **Environment Variables** section and click **Add Environment Variable** for each of the following:
+
+   | Key | Value | Description |
+   |---|---|---|
+   | `NODE_ENV` | `production` | Enables production optimizations |
+   | `PORT` | `5000` | Render assigns port dynamically, handled automatically |
+   | `FRONTEND_URL` | `https://*.vercel.app` *(or your Vercel URL once created)* | Allowed CORS origin |
+   | `SUPABASE_URL` | `https://gsarrfbnnvdpyqikqkmb.supabase.co` | Your Supabase Project URL |
+   | `SUPABASE_ANON_KEY` | `your-supabase-anon-key` | Your public Supabase anon key |
+   | `SUPABASE_SERVICE_ROLE_KEY` | `your-supabase-service-role-key` | Privileged Supabase secret key |
+   | `JWT_SECRET` | *(Enter any random 32+ character string)* | Secret for auth token signing |
+
+5. **Deploy the Service**:
+   - Click **Create Web Service** at the bottom of the page.
+   - Render will clone your repository, run `npm install`, and boot `server.js`.
+   - Once deployment completes, you will see a green **"Live"** badge.
+
+6. **Copy Your Backend URL & Test Health**:
+   - At the top of your Render service page, copy the generated URL:
+     `https://cloth-store-backend.onrender.com`
+   - Open a new browser tab and navigate to:
+     `https://cloth-store-backend.onrender.com/api/health`
+   - You should see a JSON response confirming health:
+     ```json
+     { "status": "ok", "service": "clothing-store-backend", "timestamp": "..." }
+     ```
+
+---
+
+### Step 3: Deploy Frontend on Vercel
+
+[Vercel](https://vercel.com) provides global CDN hosting for the Vite + React frontend.
+
+1. **Sign in to Vercel**:
+   - Go to [vercel.com](https://vercel.com) and log in using your GitHub account.
+
+2. **Import Your Project**:
+   - From your Vercel dashboard, click **Add New...** > **Project**.
+   - Find your GitHub repository and click **Import**.
+
+3. **Configure Project Settings**:
+   - **Project Name**: `cloth-store-frontend` *(or your preferred name)*
+   - **Framework Preset**: `Vite` *(detected automatically)*
+   - **Root Directory**:
+     - Click **Edit** next to Root Directory.
+     - Select the **`frontend`** folder and click **Continue**. *(⚠️ CRITICAL: Must be set to `frontend`!)*
+   - **Build and Output Settings**:
+     - *Build Command*: `npm run build` *(default)*
+     - *Output Directory*: `dist` *(default)*
+     - *Install Command*: `npm install` *(default)*
+
+4. **Set Production Environment Variables**:
+   Expand the **Environment Variables** panel and add:
+
+   | Key | Value | Notes |
+   |---|---|---|
+   | `VITE_API_BASE_URL` | `https://cloth-store-backend.onrender.com/api` | **Must include `/api`** and use your Render URL from Step 2 |
+   | `VITE_SUPABASE_URL` | `https://gsarrfbnnvdpyqikqkmb.supabase.co` | Your Supabase Project URL |
+   | `VITE_SUPABASE_ANON_KEY` | `your-supabase-anon-key` | Your public Supabase anon key |
+
+5. **Deploy**:
+   - Click **Deploy**.
+   - Vercel will build the frontend assets using Vite and deploy to edge servers worldwide in under a minute.
+   - Once completed, click **Go to Dashboard** or click the preview image to view your live site (e.g., `https://cloth-store-frontend.vercel.app`).
+
+---
+
+### Step 4: Final Connection & CORS Sync
+
+Now that your frontend has a live production URL:
+
+1. Copy your Vercel production domain (e.g., `https://cloth-store-frontend.vercel.app`).
+2. Go back to your [Render Dashboard](https://dashboard.render.com).
+3. Open your backend service > Navigate to **Environment**.
+4. Update the **`FRONTEND_URL`** variable:
+   ```
+   FRONTEND_URL = https://cloth-store-frontend.vercel.app
+   ```
+5. Click **Save Changes**. Render will automatically redeploy the backend with the updated CORS origin.
+
+---
+
+### 💡 Deployment Notes & Troubleshooting
+
+#### 1. Single Page Application (SPA) Routing on Vercel
+Vite React apps use client-side routing (`react-router-dom`). Without rewrite configuration, refreshing routes like `/products`, `/cart`, or `/login` on Vercel can cause a `404: NOT_FOUND` error.
+- This project includes [`frontend/vercel.json`](file:///c:/Users/NXTWAVE/cloth%20store/frontend/vercel.json) configured with rewrites to route all traffic to `/index.html`:
+  ```json
+  {
+    "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  }
+  ```
+
+#### 2. Render Free Tier Cold Starts
+- Render's free tier spins down web services after **15 minutes of inactivity** to conserve resources.
+- When waking from spin-down, the first request may take **30 to 50 seconds** to respond.
+- Subsequent requests will be instantaneous.
+
+#### 3. Database Schema Verification
+Make sure you have executed both SQL migration scripts in your Supabase SQL Editor:
+1. `001_initial_schema.sql` (Creates products catalog & seed apparel items)
+2. `002_create_users_table.sql` (Creates users credentials table & relaxes foreign key constraints)
 
 ---
 
